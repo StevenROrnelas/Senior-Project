@@ -1,0 +1,607 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>PIXI Chess Game</title>
+		<style>
+			body {
+				margin: auto;
+				padding: 0;
+				position: absolute;
+				background-color: #000000;
+			}
+		</style>
+		<script src="pixi.js"></script>
+		<script src="functions.js"></script>
+	</head>
+	<body>
+		<script>
+		var stage = new PIXI.Container();
+		var renderer = PIXI.autoDetectRenderer(600, 500);
+		document.body.appendChild(renderer.view);
+		
+		//debug option by pressing space
+		window.addEventListener('keydown', this.keyPressed.bind(this), false);
+		var debugMode = false;
+		// global variables
+		var currentPiece = 0;
+		var pieceSelected = false;
+		var defaultColor = 0xffffff;
+		var currentPosition;
+		var pieceMoved;
+		var white = 0, black = 1;
+		var playerTurn = white;
+		var numPieces = 32;
+		var checkedKingColor;
+		var whiteKingButton;
+		var blackKingButton;
+		var whiteKingChecked = false;
+		var blackKingChecked = false;
+		var kingCheckedBy;
+		
+
+		var wp1 = 1, wp2 = 2, wp3 = 3, wp4 = 4, wp5 = 5, wp6 = 6, wp7 = 7, wp8 = 8;
+		var bp1 = 9, bp2 = 10, bp3 = 11, bp4 = 12, bp5 = 13, bp6 = 14, bp7 = 15, bp8 = 16;
+		var wr1 = 17, wr2 = 18;
+		var br1 = 19, br2 = 20;
+		
+		var firstMove;
+		
+		//generate grid image and position
+		var gridsize = 36;
+
+		// button layer over the chessboard
+		var buttons = [];
+		
+		var noop = function (){
+			log("Clicked grid number: " + this.gridNum);	
+			log("This color: " + this.pieceColor);
+			log("This status: " + this.status);
+			log("this row num: " + this.rowNum);
+			
+		};
+
+		// create a 10 x 12 grid of interactive squares
+		for (var i = 0; i < 10; i++){
+			for (var j = 0; j < 12; j++){		
+				//var button = new PIXI.Sprite(textureButton);
+				
+
+				if ((i >= 1 && i <= 8) && (j >= 2 && j <= 9)){
+					if ((i%2 == 0 && j%2 != 0) || i%2 != 0 && j%2 ==0){
+						var button = PIXI.Sprite.fromImage("assets/white_grid.png");
+					}
+					else{
+						var button = PIXI.Sprite.fromImage("assets/black_grid.png");
+					}
+					// initialize board state
+					button.status = 0;
+				}
+				else{
+					var button = PIXI.Sprite.fromImage("assets/grass_grid.png");
+					button.status = -1;
+				}
+				
+				//declare row and column numbers
+				button.colNum = i;
+				button.rowNum = j;
+					
+				//button.status = 99; // declare invalid square
+				button.gridNum = (j+i*12);
+				button.buttonMode = true;
+
+				button.anchor.set(0.5);
+
+				button.position.x = gridsize*i + gridsize/2;
+				button.position.y = gridsize*j + gridsize/2;
+
+				// make the button interactive...
+				button.interactive = true;	
+				//button transparency
+				button.alpha = 0.9;
+				//mouse pointer over a button
+				button.mouseover = function(){
+					this.tint=0x00ff00;
+				}
+				//mouse pointer leaves a button
+				button.mouseout = function(){
+					this.tint=defaultColor;
+				}
+
+				//detect mouseclick
+				button.on('mousedown', movePiece);
+				//add touchscreen support
+				button.on('touchstart', movePiece);
+
+				button.tap = noop;
+				button.click = noop;
+				// add it to the stage
+				stage.addChild(button);
+
+				// add button to array
+				buttons.push(button);
+			}
+		}
+
+		//Create chess pieces
+		// load pawn image
+		var wPawnTexture = PIXI.Texture.fromImage("assets/wpawn1.png");
+		var wRookTexture = PIXI.Texture.fromImage("assets/wrook1.png");
+		var wKnightTexture = PIXI.Texture.fromImage("assets/wknight1.png");
+		var wBishopTexture = PIXI.Texture.fromImage("assets/wbishop1.png");
+		var wQueenTexture = PIXI.Texture.fromImage("assets/wqueen1.png");
+		var wKingTexture = PIXI.Texture.fromImage("assets/wking1.png");
+
+		var bPawnTexture = PIXI.Texture.fromImage("assets/bpawn1.png");
+		var bRookTexture = PIXI.Texture.fromImage("assets/brook1.png");
+		var bKnightTexture = PIXI.Texture.fromImage("assets/bknight1.png");
+		var bBishopTexture = PIXI.Texture.fromImage("assets/bbishop1.png");
+		var bQueenTexture = PIXI.Texture.fromImage("assets/bqueen1.png");
+		var bKingTexture = PIXI.Texture.fromImage("assets/bking1.png");
+	
+		//set pieces array
+		var pieces = [];
+
+		//for (var i = 0; i < 16; i++){
+		for (var i = 0; i < numPieces; i++){
+		
+			//assign textures
+			if (i >= 0 && i < 16){
+				if (i < 8)
+					var piece = new PIXI.Sprite(wPawnTexture);
+				else 
+					var piece = new PIXI.Sprite(bPawnTexture);
+			}
+			
+			if (i >= 16 && i < 20){
+				if (i < 18)
+					var piece = new PIXI.Sprite(wRookTexture);
+				else
+					var piece = new PIXI.Sprite(bRookTexture);
+			}
+			
+			if (i >= 20 && i < 24){
+				if ( i < 22)
+					var piece = new PIXI.Sprite(wKnightTexture);
+				else
+					var piece = new PIXI.Sprite(bKnightTexture);
+			}
+			
+			if (i >= 24 && i < 28){
+				if (i < 26)
+					var piece = new PIXI.Sprite(wBishopTexture);
+				else 
+					var piece = new PIXI.Sprite(bBishopTexture);
+			}
+			if (i == 28){
+				var piece = new PIXI.Sprite(wQueenTexture);
+			}
+			if (i == 29){
+				var piece = new PIXI.Sprite(bQueenTexture);
+			}
+			
+			if (i == 30){
+				var piece = new PIXI.Sprite(wKingTexture);
+			}
+			
+			if (i >= 31 && i < numPieces) {
+				var piece = new PIXI.Sprite(bKingTexture);
+			}
+			
+			piece.anchor.x = 0.5;
+			piece.anchor.y = 0.5;
+		
+			stage.addChild(piece);
+			pieces.push(piece);
+			
+			if (i < 8){
+				pieces[i].pieceColor = white;
+				pieces[i].type = 'pawn';
+			}
+			if (i >= 8 && i < 16){
+				pieces[i].pieceColor = black;
+				pieces[i].type = 'pawn';
+			}
+			if (i == 16 || i == 17){
+				pieces[i].pieceColor = white;
+				pieces[i].type = 'rook';
+			}
+			if (i == 18 || i == 19){
+				pieces[i].pieceColor = black;
+				pieces[i].type = 'rook';
+			}
+			if (i == 20 || i == 21){
+				pieces[i].pieceColor = white;
+				pieces[i].type = 'knight';
+			}
+			if (i == 22 || i == 23){
+				pieces[i].pieceColor = black;
+				pieces[i].type = 'knight';
+			}
+			if (i == 24 || i == 25){
+				pieces[i].pieceColor = white;
+				pieces[i].type = 'bishop';
+			}
+			if (i == 26 || i == 27){
+				pieces[i].pieceColor = black;
+				pieces[i].type = 'bishop';
+			}
+			if (i == 28){
+				pieces[i].pieceColor = white;
+				pieces[i].type = 'queen';
+			}
+			if (i == 29){
+				pieces[i].pieceColor = black;
+				pieces[i].type = 'queen';
+			}
+			if (i == 30){
+				pieces[i].pieceColor = white;
+				pieces[i].type = 'king';
+			}
+			if (i == 31){
+				pieces[i].pieceColor = black;
+				pieces[i].type = 'king';
+			}
+			pieces[i].firstMove = true;
+		}
+		
+		//initialize board states		
+		//Set pawn starting positions
+		//White pawns
+		for (var i = 0; i < 8; i++){
+			buttons[20+(i*12)].status = (i+1);
+		}
+		//black pawns
+		for (var i = 0; i < 8; i++){
+			buttons[15+(i*12)].status = (8+i+1);
+		}
+		//white rooks
+		buttons[21].status = 17;
+		buttons[105].status = 18;
+		//black rooks
+		buttons[14].status = 19;
+		buttons[98].status = 20;
+		
+		//white knights
+		buttons[33].status = 21;
+		buttons[93].status = 22;
+		//black knights
+		buttons[26].status = 23;
+		buttons[86].status = 24;
+		
+		//white bishops
+		buttons[45].status = 25;
+		buttons[81].status = 26;
+		//black bishops
+		buttons[38].status = 27;
+		buttons[74].status = 28;
+		
+		//white king
+		buttons[57].status = 29;
+		whiteKingButton = 69;
+		//black king
+		buttons[50].status = 30;
+		blackKingButton = 62;
+		
+		//white queen
+		buttons[69].status = 31;
+		//black queen
+		buttons[62].status = 32;
+		
+		//render the scene
+		animate();
+		
+		//functions
+		//render function
+		function animate(){
+			requestAnimationFrame(animate);
+			renderer.render(stage);
+			for (var i = 0; i<120; i++){
+				if (buttons[i].status == 0){
+					buttons.tint = defaultColor;
+				}
+	
+				for (var j = 0; j < numPieces; j++)
+				if (buttons[i].status == j+1) {
+					pieces[j].position.x = buttons[i].position.x;
+					pieces[j].position.y = buttons[i].position.y;
+					pieces[j].gridNum = buttons[i].gridnum;
+					pieces[j].rowNum = buttons[i].rowNum;
+					pieces[j].colNum = buttons[i].colNum;
+					pieces[j].status = buttons[i].status;
+					
+					//record color of piece currently on the grid
+					buttons[i].pieceColor = pieces[j].pieceColor;
+					buttons[i].type = pieces[j].type;
+				}
+			}
+		}
+		
+		function movePiece()
+		{
+			//if no piece is selected...
+			if (currentPiece == 0){
+				pieceMoved = false;
+				currentPiece = this.status;
+				this.tint=0xf000f0;
+
+				if (this.status > 0 && this.status < numPieces+1){
+					pieceType = pieces;
+					pieceType[currentPiece-1].tint = 0x00f0f0;
+				} 
+				
+				currentPosition = this.gridNum;
+				if (currentPiece < 0){
+					currentPiece = 0;
+				}
+				
+				if (currentPiece > 0){
+					return;
+				}
+			}
+			
+			//if there is a piece selected...
+			
+			//movement rules
+			//If player has a piece chosen
+			if (currentPiece > 0){
+				//If there's no movement
+				if (this.status == pieceType[currentPiece-1].status) {
+					pieceType[currentPiece-1].tint = defaultColor;
+					currentPiece = 0;
+					return;
+				}
+				
+				//If it's not this team's turn
+				if (debugMode == false)
+				{
+					if (pieceType[currentPiece-1].pieceColor == white && playerTurn != white ||
+					    pieceType[currentPiece-1].pieceColor == black && playerTurn != black
+						)
+						{
+							log("Not your turn!");
+							pieceType[currentPiece-1].tint = defaultColor;
+							currentPiece = 0;
+							return;
+						}
+				}
+
+				//PAWNS
+				if (pieceType[currentPiece-1].type == 'pawn')
+				{
+					if (this.status == 0 || this.pieceColor != pieceType[currentPiece-1].pieceColor  && this.status != -1)
+					{
+						//if a white pawn is being moved
+						if (pieceType[currentPiece-1].pieceColor == white) {
+							if  ((  this.rowNum == pieceType[currentPiece-1].rowNum - 1 && this.colNum == pieceType[currentPiece-1].colNum
+									&& this.status == 0)
+							    || (this.rowNum == pieceType[currentPiece-1].rowNum - 2 && pieceType[currentPiece-1].firstMove == true 
+									&& this.colNum == pieceType[currentPiece-1].colNum  && this.status == 0)
+								|| (this.rowNum == pieceType[currentPiece-1].rowNum - 1 && this.colNum == pieceType[currentPiece-1].colNum - 1
+									&& this.status != 0)
+								|| (this.rowNum == pieceType[currentPiece-1].rowNum - 1 && this.colNum == pieceType[currentPiece-1].colNum + 1
+									&& this.status != 0))
+							{
+								updatePosition(this);
+							}
+						}
+						//otherwise it's a black pawn
+						else
+						{
+							if  ((  this.rowNum == pieceType[currentPiece-1].rowNum + 1 && this.colNum == pieceType[currentPiece-1].colNum
+									&& this.status == 0)
+								|| (this.rowNum == pieceType[currentPiece-1].rowNum + 2 && pieceType[currentPiece-1].firstMove == true
+									&& this.colNum == pieceType[currentPiece-1].colNum  && this.status == 0)
+								|| (this.rowNum == pieceType[currentPiece-1].rowNum + 1 && this.colNum == pieceType[currentPiece-1].colNum - 1
+									&& this.status != 0)
+								|| (this.rowNum == pieceType[currentPiece-1].rowNum + 1 && this.colNum == pieceType[currentPiece-1].colNum + 1
+									&& this.status != 0)) 
+							{	
+								updatePosition(this);
+							}
+						}
+					}
+
+				log("pieceType[]" + pieceType[buttons[this.gridNum].status].type);					
+				}
+
+				//ROOKS
+				if (pieceType[currentPiece-1].type == 'rook'){
+					if (this.status == 0 || this.pieceColor != pieceType[currentPiece-1].pieceColor && this.status != -1){
+						// Legal moves: same column or same row
+						if (pieceType[currentPiece-1].rowNum == this.rowNum || pieceType[currentPiece-1].colNum == this.colNum){						
+							
+							if (!validMove(pieceType[currentPiece-1], this, pieceType[currentPiece-1].type))
+							{
+								log("Invalid rook move!");
+								pieceType[currentPiece-1].tint = defaultColor;
+								currentPiece = 0;
+								pieceMoved = false;
+								return;
+							}
+							updatePosition(this);
+						}
+					}
+					
+				log("pieceType[]" + pieceType[buttons[this.gridNum].status].type);
+				}
+				
+				//KNIGHT
+				if (pieceType[currentPiece-1].type == 'knight'){
+					if (this.status == 0 || this.pieceColor != pieceType[currentPiece-1].pieceColor  && this.status != -1){
+						if ((  this.rowNum == pieceType[currentPiece-1].rowNum -2 && this.colNum == pieceType[currentPiece-1].colNum -1)
+						   || (this.rowNum == pieceType[currentPiece-1].rowNum -1 && this.colNum == pieceType[currentPiece-1].colNum -2)
+						   || (this.rowNum == pieceType[currentPiece-1].rowNum +1 && this.colNum == pieceType[currentPiece-1].colNum -2)
+						   || (this.rowNum == pieceType[currentPiece-1].rowNum +2 && this.colNum == pieceType[currentPiece-1].colNum -1)
+						   || (this.rowNum == pieceType[currentPiece-1].rowNum -2 && this.colNum == pieceType[currentPiece-1].colNum +1)
+						   || (this.rowNum == pieceType[currentPiece-1].rowNum -1 && this.colNum == pieceType[currentPiece-1].colNum +2)
+						   || (this.rowNum == pieceType[currentPiece-1].rowNum +1 && this.colNum == pieceType[currentPiece-1].colNum +2)
+						   || (this.rowNum == pieceType[currentPiece-1].rowNum +2 && this.colNum == pieceType[currentPiece-1].colNum +1)) {
+								updatePosition(this);
+						}
+					}
+					
+				log("pieceType[]" + pieceType[buttons[this.gridNum].status].type);
+				}
+				
+				
+				//BISHOP
+				if (pieceType[currentPiece-1].type == 'bishop'){
+					if (this.status == 0 || this.pieceColor != pieceType[currentPiece-1].pieceColor  && this.status != -1){
+						for (var i = 1; i < 8; i++){
+							if ((	this.rowNum == pieceType[currentPiece-1].rowNum +i && this.colNum == pieceType[currentPiece-1].colNum +i) //permit move diagonal bottom right
+								|| (this.rowNum == pieceType[currentPiece-1].rowNum -i && this.colNum == pieceType[currentPiece-1].colNum +i) //permit move diagonal top right
+								|| (this.rowNum == pieceType[currentPiece-1].rowNum +i && this.colNum == pieceType[currentPiece-1].colNum -i) //permit move diagonal bottom left
+								|| (this.rowNum == pieceType[currentPiece-1].rowNum -i && this.colNum == pieceType[currentPiece-1].colNum -i) //permit move diagonal top left
+							){
+								if (!validMove(pieceType[currentPiece-1], this, pieceType[currentPiece-1].type))
+								{
+									log("Invalid bishop move!");
+									pieceType[currentPiece-1].tint = defaultColor;
+									currentPiece = 0;
+									pieceMoved = false;
+									return;
+								}
+								//checkDiagonal(pieceType[currentPiece-1]);
+								updatePosition(this);
+							}
+						}
+					}
+					
+				log("pieceType[]" + pieceType[buttons[this.gridNum].status].type);
+				}
+				
+				//QUEEN
+				if (pieceType[currentPiece-1].type == 'queen'){
+					if (this.status == 0 || this.pieceColor != pieceType[currentPiece-1].pieceColor  && this.status != -1){
+						for (var i = 1; i < 8; i++){
+							if ((	this.rowNum == pieceType[currentPiece-1].rowNum +i && this.colNum == pieceType[currentPiece-1].colNum +i) //permit move diagonal bottom right
+								|| (this.rowNum == pieceType[currentPiece-1].rowNum -i && this.colNum == pieceType[currentPiece-1].colNum +i) //permit move diagonal top right
+								|| (this.rowNum == pieceType[currentPiece-1].rowNum +i && this.colNum == pieceType[currentPiece-1].colNum -i) //permit move diagonal bottom left
+								|| (this.rowNum == pieceType[currentPiece-1].rowNum -i && this.colNum == pieceType[currentPiece-1].colNum -i) //permit move diagonal top left
+							){
+								if (!validMove(pieceType[currentPiece-1], this, pieceType[currentPiece-1].type))
+								{
+									log("Invalid queen move!");
+									pieceType[currentPiece-1].tint = defaultColor;
+									currentPiece = 0;
+									pieceMoved = false;
+									return;
+								}
+								updatePosition(this);
+							}
+						}
+						if (pieceType[currentPiece-1].rowNum == this.rowNum || pieceType[currentPiece-1].colNum == this.colNum){
+							if (!validMove(pieceType[currentPiece-1], this, pieceType[currentPiece-1].type))
+							{
+								log("Invalid queen move!");
+								pieceType[currentPiece-1].tint = defaultColor;
+								currentPiece = 0;
+								pieceMoved = false;
+								return;
+							}
+							updatePosition(this);
+						}
+					}
+					
+				log("pieceType[]" + pieceType[buttons[this.gridNum].status].type);
+				}
+				
+				//KING
+				if (pieceType[currentPiece-1].type == 'king'){
+					if (this.status == 0 || this.pieceColor != pieceType[currentPiece-1].pieceColor  && this.status != -1){
+						if ((	this.rowNum == pieceType[currentPiece-1].rowNum +1 && this.colNum == pieceType[currentPiece-1].colNum +1) //permit move diagonal bottom right
+							|| (this.rowNum == pieceType[currentPiece-1].rowNum -1 && this.colNum == pieceType[currentPiece-1].colNum +1) //permit move diagonal top right
+							|| (this.rowNum == pieceType[currentPiece-1].rowNum +1 && this.colNum == pieceType[currentPiece-1].colNum -1) //permit move diagonal bottom left
+							|| (this.rowNum == pieceType[currentPiece-1].rowNum -1 && this.colNum == pieceType[currentPiece-1].colNum -1) //permit move diagonal top left
+							
+							|| (this.rowNum == pieceType[currentPiece-1].rowNum -1 && this.colNum == pieceType[currentPiece-1].colNum +0) //permit move up
+							|| (this.rowNum == pieceType[currentPiece-1].rowNum +0 && this.colNum == pieceType[currentPiece-1].colNum +1) //permit move right
+							|| (this.rowNum == pieceType[currentPiece-1].rowNum +1 && this.colNum == pieceType[currentPiece-1].colNum +0) //permit move down
+							|| (this.rowNum == pieceType[currentPiece-1].rowNum +0 && this.colNum == pieceType[currentPiece-1].colNum -1) //permit move right
+						){
+							if (pieceType[currentPiece-1].pieceColor == white){
+								prevKingButton = whiteKingButton;
+								whiteKingButton = this.gridNum;
+							}
+							else {
+								prevKingButton = blackKingButton;
+								blackKingButton = this.gridNum;
+							}
+							
+							if (!validMove(pieceType[currentPiece-1], this, pieceType[currentPiece-1].type))
+							{
+								pieceType[currentPiece-1].tint = defaultColor;
+								pieceType[currentPiece-1].pieceColor == white ? whiteKingButton = prevKingButton : blackKingButton = prevKingButton;
+								currentPiece = 0;
+								pieceMoved = false;
+								return;
+							}
+							updatePosition(this);
+						}
+					}
+					
+					//Castling
+					if (this.status == 0){
+						//Castling white king right
+						if (this.rowNum == pieceType[wr2-1].rowNum +0 && this.colNum == pieceType[currentPiece-1].colNum +2
+							&& pieceType[currentPiece-1].firstMove == true && pieceType[wr2-1].firstMove == true){
+							if (!validMove(pieceType[currentPiece-1], this, pieceType[currentPiece-1].type))
+							{
+								log("Invalid queen move!");
+								pieceType[currentPiece-1].tint = defaultColor;
+								currentPiece = 0;
+								pieceMoved = false;
+								return;
+							}
+							//update white rook 2 position
+							buttons[currentPosition+(3*12)].status = 0;
+							buttons[currentPosition+12].status = wr2;
+							pieceType[wr2-1].firstMove = false;
+							
+							updatePosition(this);
+						}
+						//Castling white king left
+						if (this.rowNum == pieceType[wr1-1].rowNum +0 && this.colNum == pieceType[currentPiece-1].colNum -2
+							&& pieceType[currentPiece-1].firstMove == true && pieceType[wr1-1].firstMove == true){
+							if (!validMove(pieceType[currentPiece-1], this, pieceType[currentPiece-1].type))
+							{
+								log("Invalid queen move!");
+								pieceType[currentPiece-1].tint = defaultColor;
+								currentPiece = 0;
+								pieceMoved = false;
+								return;
+							}
+							//update white rook 1 position
+							buttons[currentPosition-(4*12)].status = 0;
+							buttons[currentPosition-(12)].status = wr1;
+							pieceType[wr1-1].firstMove = false;
+							
+							updatePosition(this);
+						}
+					}
+				}
+	
+				//After finishing the move, player no longer has a piece selected
+				pieceType[currentPiece-1].tint = defaultColor;
+				
+				//move is finished, check if King is checked
+				//checkKing();
+				//alternate player turns
+				if (playerTurn == white && pieceMoved == true){
+					playerTurn = black;
+					currentPiece = 0;
+					return;
+				}
+				if (playerTurn == black && pieceMoved == true){
+					playerTurn = white;
+					currentPiece = 0;
+					return;
+				}
+				pieceMoved = false
+				currentPiece = 0;
+			}
+		}
+		</script>
+	</body>
+</html>
